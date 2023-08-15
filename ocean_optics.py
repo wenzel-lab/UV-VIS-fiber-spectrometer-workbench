@@ -24,6 +24,7 @@ from seabreeze.spectrometers import Spectrometer
 spectrometer = Spectrometer.from_first_available()
 
 import time
+import os
 import numpy as np
 import matplotlib
 matplotlib.use('WXAgg')
@@ -79,6 +80,7 @@ class LiveView(wx.Panel):
         self.sizer15 = wx.BoxSizer(wx.HORIZONTAL)   # ymax
         
         self.sizer17 = wx.BoxSizer(wx.HORIZONTAL)
+        self.sizer18 = wx.BoxSizer(wx.HORIZONTAL)
 
 
 
@@ -94,23 +96,23 @@ class LiveView(wx.Panel):
         self.stopbutton=wx.Button(self,label="stop",pos=(225,32),size=(90,30))
         self.Bind(wx.EVT_BUTTON, self.stop, self.stopbutton)
 
-        self.IntLabel = wx.StaticText(self, -1, "    Integration time (ms):", size=(150,20))
-        self.Int = NumCtrl(self, id=-1, value = 20000, integerWidth = 9, fractionWidth = 0)
+        self.IntLabel = wx.StaticText(self, -1, "    Integration time (milisec):", size=(150,20))
+        self.Int = NumCtrl(self, id=-1, value = 20, integerWidth = 9, fractionWidth = 0)
         self.Bind(wx.EVT_TEXT, self.refresh, self.Int)
 
-        self.AvgLabel = wx.StaticText(self, -1, "    Averaging:", size=(150,20))
+        self.AvgLabel = wx.StaticText(self, -1, "    Wavelenght convolution window:", size=(150,20))
         self.Avg = NumCtrl(self, id=-1, value = 1, integerWidth = 4, fractionWidth = 0)
         #self.Bind(wx.EVT_TEXT, self.refresh, self.AvgLabel)
 
         self.backgrdLabel = wx.StaticText(self, -1, "    Background", size=(110,20))
-        self.backgrdbutton1=wx.Button(self,label="zero",pos=(225,32),size=(45,-1))
+        self.backgrdbutton1=wx.Button(self,label="reset",pos=(225,32),size=(45,-1))
         self.Bind(wx.EVT_BUTTON, self.zero_background, self.backgrdbutton1)
         self.backgrdbutton2=wx.Button(self,label="set",pos=(225,32),size=(45,-1))
         self.Bind(wx.EVT_BUTTON, self.set_background, self.backgrdbutton2)
 
         
         self.referenceLabel = wx.StaticText(self, -1, "    Reference", size=(110,20))
-        self.referencebutton1=wx.Button(self,label="zero",pos=(225,32),size=(45,-1))
+        self.referencebutton1=wx.Button(self,label="reset",pos=(225,32),size=(45,-1))
         self.Bind(wx.EVT_BUTTON, self.zero_reference, self.referencebutton1)
         self.referencebutton2=wx.Button(self,label="set",pos=(225,32),size=(45,-1))
         self.Bind(wx.EVT_BUTTON, self.set_reference, self.referencebutton2)
@@ -152,6 +154,9 @@ class LiveView(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.absorbance_on, self.absorbance_on_button)
         self.absorbance_off_button=wx.Button(self,label="Off",pos=(225,32),size=(45,-1))
         self.Bind(wx.EVT_BUTTON, self.absorbance_off, self.absorbance_off_button)
+
+        self.scantimeLabel = wx.StaticText(self, -1, "    Scan to average:", size=(150,20))
+        self.scan_time = NumCtrl(self, id=-1, value = 1, integerWidth = 10, fractionWidth = 0)
         
 
       
@@ -182,6 +187,7 @@ class LiveView(wx.Panel):
         self.sizer7.Add(self.sizer15, flag=wx.EXPAND)
 
         self.sizer16.Add(self.sizer17, flag=wx.EXPAND)
+        self.sizer16.Add(self.sizer18, flag=wx.EXPAND)
 
         self.sizer5.Add(self.livebutton)
         self.sizer5.Add(self.recordbutton)
@@ -228,7 +234,10 @@ class LiveView(wx.Panel):
 
         self.sizer17.Add(self.absorbanceLabel)      
         self.sizer17.Add(self.absorbance_on_button)
-        self.sizer17.Add(self.absorbance_off_button)          
+        self.sizer17.Add(self.absorbance_off_button)     
+
+        self.sizer18.Add(self.scantimeLabel)     
+        self.sizer18.Add(self.scan_time)
     
 
         
@@ -243,6 +252,8 @@ class LiveView(wx.Panel):
         self.reference = np.ones(len(self.int))
 
         self.avgnum = 1
+        self.scan_time_window = 1 
+        self.time_buffer = list()
 
         self.data = (self.int - self.background)/self.reference
 
@@ -274,23 +285,21 @@ class LiveView(wx.Panel):
         if self.Avg.GetValue() == 0:
             self.avgnum = 1
         else:
-            self.avgnum = self.Avg.GetValue()  
-
-        
+            self.avgnum = self.Avg.GetValue()
                     
-        self.int = self.spectrometer.intensities()[2:]      
-        self.avg_window = np.hamming(self.avgnum)#np.ones(self.avgnum)                
+        self.int = self.spectrometer.intensities()[2:]
+
+        # Taking wavelength averaging      
+        self.avg_window = np.hamming(self.avgnum)               
         self.avgint = np.convolve(self.int, self.avg_window, 'same')/self.avgnum
         self.avgref = np.convolve(self.reference, self.avg_window, 'same')/self.avgnum
         
-        #print(self.zero_ref)
+        # 
         if self.zero_ref == 0:
             self.int_ref_treshold = 100
-            self.data = self.avgint - self.background   #when dividing by the reference value, we got the transmittance.
+            self.data = self.avgint - self.background   
             bool_array = self.data > self.int_ref_treshold
-            first = np.where(bool_array)[0][0]
-            last = np.where(bool_array)[0][-1]
-            #self.data[first:last] = 100 * self.data[first:last]/(self.avgref[first:last])
+            
             self.data = 100 * self.data/self.avgref
 
         else:
@@ -305,12 +314,40 @@ class LiveView(wx.Panel):
         if self.absorbance == True:
             self.data = self.data/100 + 0.1 * (self.data/100 < 0.001)
             self.data = -np.log(self.data)
-        print(self.data, border)        
-        self.graph.set_ydata(self.data)
+
+        
+        
+        if self.scan_time.GetValue() == 0:
+            self.scan_time_window = 1
+        else:
+            self.scan_time_window = self.scan_time.GetValue() 
+        time_buffer = self.time_buffer
+
+        print('scan_time_window', self.scan_time_window)
+        print('largo de time buffer', len(self.time_buffer))
+        if len(self.time_buffer) > self.scan_time_window:
+            time_buffer.pop(0)
+        elif len(self.time_buffer) == self.scan_time_window:
+            time_buffer.pop(0)
+            time_buffer.append(self.data)
+            print('self.data antes',self.data)
+        elif len(self.time_buffer) < self.scan_time_window:
+            time_buffer.append(self.data)
+        self.time_buffer = time_buffer
+                
+        
+        arr_buff = np.array(self.time_buffer)
+        
+        self.avg_time_data = np.average(arr_buff, axis = 0)
+        
+        
+        self.graph.set_ydata(self.avg_time_data)
+        
         self.graph.set_color("blue")
 
-        if max(self.int[800:3000]) ==32000:
+        if max(self.int) > 60000:
             self.graph.set_color("red")
+            print('holas')
 
         if self.xminstate == False:
             self.minx = 170
@@ -327,10 +364,10 @@ class LiveView(wx.Panel):
         else:
             self.miny = self.yminVal.GetValue()
 
-        #if self.ymaxstate == False:
-        self.maxy = max(self.data)*1.1
-        #else:
-        #self.maxy = self.ymaxVal.GetValue()
+        if self.ymaxstate == False:
+            self.maxy = max(self.data)*1.1
+        else:
+            self.maxy = self.ymaxVal.GetValue()
 
             
         
@@ -345,13 +382,20 @@ class LiveView(wx.Panel):
     def refresh(self, event):
         
         self.intTimeS = self.Int.GetValue()
-        self.intTimes = 20000
+        
+        #self.intTimes = 20
+        self.intTimeS = self.intTimeS*1000
         self.spectrometer.integration_time_micros(self.intTimeS)
 
         if self.Avg.GetValue() == 0:
             self.avgnum = 1
         else:
             self.avgnum = self.Avg.GetValue()       
+        
+        #if self.scan_time.GetValue() == 0:
+        #    self.scan_time_window = 1
+        #else:
+        #    self.scan_time_window = self.scan_time.GetValue() 
 
     def set_background(self, event):
         self.background = self.avgint
@@ -444,15 +488,15 @@ class LiveView(wx.Panel):
             self.live(self)
 
     def save(self,event):
-         
+
+        os.mkdir(self.dataFile.GetValue())
         self.index = self.dataIndex.GetValue()
-        file = open(""+str(self.dataFile.GetValue())+str(self.index)+".txt", "w")
+        file = open(""+str(self.dataFile.GetValue())+"/timestep"+str(self.index)+".txt", "w")
         file.write("Time: "+str(time.time())+"\n")
         for i in range (0, len(self.wl)):
             file.write(""+str(self.wl[i])+" "+str(self.data[i])+"\n")
         file.close()
         print("Spectrum "+str(self.index)+" recorded")
-        #self.index =
         self.dataIndex.SetValue(self.index+1)
 
     def stop(self,event):
