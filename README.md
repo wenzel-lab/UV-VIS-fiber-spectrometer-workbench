@@ -1,2 +1,3 @@
-# USB spectrometer python interface
-Custom Python interface to operate Ocean Optics USB spectrometers
+# OpenUC2 cube based spectrometer workbench with an OceanOptics spectrometer
+
+...with a custom Python interface to operate Ocean Optics USB fiber spectrometers
