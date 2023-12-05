@@ -5,5 +5,7 @@ This is a custom open source python interface to run an OCEAN OPTICS USB4000 fib
 # Installation instructions for windows
   
 * install seabreaze library for having python driver to use spectrometer
-  pip install seabreeze
+  
+  `pip install seabreeze`
+  
 * install wx library for graphical interface   
