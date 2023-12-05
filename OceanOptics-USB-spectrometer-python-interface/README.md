@@ -8,4 +8,8 @@ This is a custom open source python interface to run an OCEAN OPTICS USB4000 fib
   
   `pip install seabreeze`
   
-* install wx library for graphical interface   
+* install wx library for graphical interface
+
+   `pip install wxpython`
+
+* install python librearies used for the interface if not already running on your system: numpy scipy matplotlib
