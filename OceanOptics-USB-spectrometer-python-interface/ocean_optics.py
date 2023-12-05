@@ -1,23 +1,3 @@
-##installation instructions:
-##    
-##    download libusb-0.1 (for windows: http://sourceforge.net/projects/libusb-win32/)
-##        unzip to local folder
-##        open folder, enter bin-directory and run inf-wizard
-##        follow onscreen instructions. on last screen, click "install now"
-##
-##    download pyusb-1.0.0b1 (http://walac.github.io/pyusb/)
-##        unzip to local folder
-##        open command line, cd to directory
-##        type "python setup.py install"
-##    download ap--/python-oceanoptics (https://github.com/ap--/python-oceanoptics)
-##        unzip to local folder
-##        open command line, cd to directory
-##        type "python setup.py install"
-##          
-
-
-
-
 #import oceanoptics
 
 from seabreeze.spectrometers import Spectrometer
